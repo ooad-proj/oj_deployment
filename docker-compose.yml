@@ -1,0 +1,63 @@
+version: "3.0"
+
+services:
+  redis:
+    image: redis:6
+    restart: always
+    ports:
+      - 6379:6379
+    
+
+  mysql:
+    image: mysql:8.0.21
+    restart: always
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ABC_abc_123
+      MYSQL_DATABASE: onlineJudge
+      MYSQL_USER: judge
+      MYSQL_PASSWORD: judge
+    ports:
+      - 3306:3306
+      - 33060:33060
+    volumes:
+      - "./data/mysql/data/:/var/lib/mysql/"
+      - "./data/mysql/conf/:/etc/mysql/conf.d/"
+      - "./data/mysql/init/:/docker-entrypoint-initdb.d/"
+    command:
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_general_ci
+      --explicit_defaults_for_timestamp=true
+      --lower_case_table_names=1
+    
+  rabbitmq:
+    environment:
+      RABBITMQ_DEFAULT_USER: "guest"
+      RABBITMQ_DEFAULT_PASS: "guest"
+    image: "rabbitmq:3.7.16-management"
+    restart: always
+    volumes:
+      - "./data/rabbitmq/data:/var/lib/rabbitmq"
+      - "./data/rabbitmq/log:/var/log/rabbitmq/log"
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+      
+  backend:
+    image: wzy1935/oj-backend:v1
+    restart: always
+    depends_on:
+      - "rabbitmq"
+      - "mysql"
+      - "redis"
+    ports:
+      - "80:8082"
+
+  judgeserver:
+    image: wzy1935/judge-server:v1
+    restart: always
+    depends_on:
+      - "rabbitmq"
+    command: ["bash", "./wait-for-it.sh", "rabbitmq:5672", "-t", "5", "--", "java", "-jar", "oj_judge_server.jar"]
+    
